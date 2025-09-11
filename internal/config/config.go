@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
@@ -49,6 +50,10 @@ type Config struct {
 	
 	// Legacy REDIS_URL for backward compatibility
 	RedisURL    string `envconfig:"REDIS_URL"`
+	
+	// Admin notification configuration
+	AdminNotifications bool   `envconfig:"ADMIN_NOTIFICATIONS" default:"true"`
+	AdminTelegramIDs   string `envconfig:"ADMIN_TELEGRAM_IDS" default:""` // Comma-separated list of Telegram user IDs
 }
 
 // GetDBDSN constructs the database DSN from individual fields or returns the legacy DSN
@@ -96,4 +101,28 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// GetAdminTelegramIDs returns a list of admin Telegram user IDs
+func (c *Config) GetAdminTelegramIDs() []int64 {
+	if c.AdminTelegramIDs == "" {
+		return nil
+	}
+	
+	parts := strings.Split(c.AdminTelegramIDs, ",")
+	ids := make([]int64, 0, len(parts))
+	
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		
+		id, err := strconv.ParseInt(part, 10, 64)
+		if err == nil {
+			ids = append(ids, id)
+		}
+	}
+	
+	return ids
 }

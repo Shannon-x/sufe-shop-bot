@@ -231,8 +231,9 @@ func (s *Server) Router() *gin.Engine {
 		).ServeHTTP(c.Writer, c.Request)
 	})
 	
-	// Add request logging middleware
+	// Add middleware
 	r.Use(s.requestLogger())
+	r.Use(ErrorHandlerMiddleware())
 	
 	// Public routes
 	public := r.Group("/")
