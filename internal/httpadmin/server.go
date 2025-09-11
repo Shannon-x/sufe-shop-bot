@@ -218,84 +218,12 @@ func (s *Server) Router() *gin.Engine {
 	// Load HTML templates AFTER setting functions
 	r.LoadHTMLGlob("templates/*")
 
-	// Health check
-	r.GET("/healthz", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-	
-	// Metrics endpoint
-	r.GET("/metrics", func(c *gin.Context) {
-		promhttp.HandlerFor(
-			prometheus.DefaultGatherer,
-			promhttp.HandlerOpts{},
-		).ServeHTTP(c.Writer, c.Request)
-	})
-	
 	// Add middleware
 	r.Use(s.requestLogger())
 	r.Use(ErrorHandlerMiddleware())
 	
-	// Public routes
-	public := r.Group("/")
-	{
-		// Login page
-		public.GET("/login", s.handleLoginPage)
-		public.POST("/api/login", s.handleLogin)
-		public.POST("/api/logout", s.handleLogout)
-		
-		// Test endpoint to check products
-		public.GET("/test/products", func(c *gin.Context) {
-			var products []store.Product
-			s.db.Find(&products)
-			c.JSON(200, gin.H{
-				"count": len(products),
-				"products": products,
-			})
-		})
-	}
-	
-	// Payment routes (no auth required for callbacks)
-	payment := r.Group("/payment")
-	{
-		payment.POST("/epay/notify", s.handleEpayNotify)
-		payment.GET("/return", s.handlePaymentReturn)
-	}
-
-	// Admin routes with auth
-	admin := r.Group("/admin")
-	admin.Use(s.authMiddleware())
-	{
-		// Product management
-		admin.GET("/products", s.handleProductList)
-		admin.POST("/products", s.handleProductCreate)
-		admin.PUT("/products/:id", s.handleProductUpdate)
-		admin.DELETE("/products/:id", s.handleProductDelete)
-		
-		// Inventory management
-		admin.GET("/products/:id/codes", s.handleProductCodes)
-		admin.POST("/products/:id/codes/upload", s.handleCodesUpload)
-		admin.DELETE("/codes/:id", s.handleCodeDelete)
-		
-		// Order management
-		admin.GET("/orders", s.handleOrderList)
-		
-		// Recharge card management
-		admin.GET("/recharge-cards", s.handleRechargeCardList)
-		admin.POST("/recharge-cards/generate", s.handleRechargeCardGenerate)
-		admin.DELETE("/recharge-cards/:id", s.handleRechargeCardDelete)
-		admin.GET("/recharge-cards/:id/usage", s.handleRechargeCardUsage)
-		
-		// Message template management
-		admin.GET("/templates", s.handleTemplateList)
-		admin.POST("/templates/:id", s.handleTemplateUpdate)
-		
-		// System settings
-		admin.GET("/settings", s.handleSettingsList)
-		admin.POST("/settings", s.handleSettingsUpdate)
-		
-		// Admin dashboard
-		admin.GET("/", s.handleAdminDashboard)
-	}
+	// Set up all routes
+	s.SetupRoutes(r)
 
 	return r
 }
@@ -644,8 +572,8 @@ func (s *Server) processPaymentNotification(c *gin.Context, params url.Values) {
 	
 	// Verify amount
 	notifyMoney, _ := strconv.ParseFloat(notify.Money, 64)
-	if int(notifyMoney*100) != order.PaymentAmount {
-		logger.Error("Amount mismatch", "expected", order.PaymentAmount, "received", notifyMoney*100)
+	if int(notifyMoney*100) != order.AmountCents {
+		logger.Error("Amount mismatch", "expected", order.AmountCents, "received", notifyMoney*100)
 		return
 	}
 	
